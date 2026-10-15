@@ -372,3 +372,98 @@ def test_outbound_call_endpoint_uses_the_provider_and_reports_missing_config(api
         "seller_id": "co_sup_b", "to_number": "+911234567890"})
     assert r.status_code == 201 and r.json()["conversation_id"] == "conv_x"
     assert placed["vars"]["session_token"] and "budget" not in json.dumps(placed["vars"])
+
+
+# --- browser voice: signed URL, body tokens, pull-based finalization ---------------------
+
+from app.voice.routes import get_optional_voice_client  # noqa: E402
+
+
+class FakeProvider:
+    agent_id = "agent_test"
+
+    def __init__(self, conversations=None):
+        self.conversations = conversations or {}
+        self.calls = 0
+
+    def signed_url(self):
+        return "wss://example.test/signed"
+
+    def conversation(self, conversation_id):
+        self.calls += 1
+        seq = self.conversations[conversation_id]
+        return seq[min(self.calls - 1, len(seq) - 1)]
+
+
+def conv(call_session, status="done", agent="agent_test", results=None, transcript=None, call_id=None):
+    dv = dict(call_session["dynamic_variables"])
+    if call_id is not None:
+        dv["call_id"] = call_id
+    return {"agent_id": agent, "conversation_id": "conv_b", "status": status,
+            "transcript": transcript if transcript is not None else GOOD_TRANSCRIPT,
+            "analysis": {"data_collection_results": results if results is not None else good_results()},
+            "conversation_initiation_client_data": {"dynamic_variables": dv}}
+
+
+def test_session_reports_when_browser_voice_is_unavailable(api):
+    open_rfq(api)
+    s = session(api)
+    assert s["signed_url"] is None and "not configured" in s["browser_voice_error"]
+
+
+def test_session_returns_a_signed_url_when_configured(api):
+    open_rfq(api)
+    app.dependency_overrides[get_optional_voice_client] = lambda: FakeProvider()
+    s = session(api)
+    assert s["signed_url"] == "wss://example.test/signed" and s["browser_voice_error"] is None
+
+
+def test_tools_accept_the_session_token_in_the_body(api):
+    open_rfq(api)
+    tok = session(api)["session_token"]
+    r = api.anon.post("/voice/tools/get_current_offer", json={"mpn": "BME280", "session_token": tok})
+    assert r.status_code == 200 and r.json()["qty_required"] == 100
+    bad = api.anon.post("/voice/tools/get_current_offer", json={"mpn": "BME280", "session_token": "x"})
+    assert bad.status_code == 401
+
+
+def test_finalize_without_conversation_releases_the_supplier(api, seeded):
+    open_rfq(api)
+    s = session(api)
+    r = api.buyer.post(f"/rfqs/{RFQ}/voice/{s['call_id']}/finalize", json={})
+    assert r.status_code == 200 and r.json()["status"] == "failed"
+    rfq = seeded.rfqs.find_one({"_id": RFQ})
+    assert next(p for p in rfq["participants"] if p["company_id"] == "co_sup_a")["controller"] == "agent"
+
+
+def test_finalize_pulls_the_conversation_and_records_a_live_voice_offer(api, seeded):
+    open_rfq(api)
+    s = session(api)
+    fake = FakeProvider({"conv_b": [conv(s, status="processing"), conv(s)]})
+    app.dependency_overrides[get_optional_voice_client] = lambda: fake
+    r = api.buyer.post(f"/rfqs/{RFQ}/voice/{s['call_id']}/finalize", json={"conversation_id": "conv_b"})
+    assert r.status_code == 200, r.text
+    assert r.json()["status"] == "completed" and fake.calls == 2
+    offer = seeded.offers.find_one({"rfq_id": RFQ, "source": "voice_confirmed", "status": {"$ne": "accepted"}})
+    assert offer["voice_mode"] == "live" and offer["conversation_id"] == "conv_b" and offer["unit_price"] == 395.0
+    again = api.buyer.post(f"/rfqs/{RFQ}/voice/{s['call_id']}/finalize", json={"conversation_id": "conv_b"})
+    assert again.json()["idempotent"] is True
+
+
+def test_finalize_rejects_a_conversation_from_another_call_or_agent(api):
+    open_rfq(api)
+    s = session(api)
+    app.dependency_overrides[get_optional_voice_client] = lambda: FakeProvider({"conv_b": [conv(s, call_id="someone_else")]})
+    assert api.buyer.post(f"/rfqs/{RFQ}/voice/{s['call_id']}/finalize",
+                          json={"conversation_id": "conv_b"}).status_code == 403
+    s2 = session(api, seller="co_sup_b")
+    app.dependency_overrides[get_optional_voice_client] = lambda: FakeProvider({"conv_b": [conv(s2, agent="agent_other")]})
+    assert api.buyer.post(f"/rfqs/{RFQ}/voice/{s2['call_id']}/finalize",
+                          json={"conversation_id": "conv_b"}).status_code == 403
+
+
+def test_other_buyers_cannot_finalize_my_call(api):
+    open_rfq(api)
+    s = session(api)
+    r = api.other_buyer.post(f"/rfqs/{RFQ}/voice/{s['call_id']}/finalize", json={})
+    assert r.status_code == 404

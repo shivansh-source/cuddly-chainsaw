@@ -12,6 +12,10 @@ settings.mongodb_uri = os.environ.get("TEST_MONGODB_URI", "mongodb://localhost:2
 settings.mongodb_db = "negotiator_test"
 settings.groq_api_key = ""  # force the deterministic path unless a test injects an LLM
 settings.jwt_secret = "test-secret"
+# Never call the real voice provider from tests; tests inject fakes instead.
+settings.elevenlabs_api_key = ""
+settings.elevenlabs_agent_id = ""
+settings.elevenlabs_phone_number_id = ""
 
 from fastapi.testclient import TestClient  # noqa: E402
 

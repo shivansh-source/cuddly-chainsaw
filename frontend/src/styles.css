@@ -373,3 +373,11 @@ a.brand { text-decoration: none; color: inherit; }
   .lp-row-rej { grid-template-columns: 18px 1fr; }
   .lp-rounds { grid-template-columns: 1fr; }
 }
+
+/* ------------------------------------------------------------- live voice */
+.live { display: flex; flex-direction: column; gap: 10px; padding: 14px; margin: 4px 0 12px; border: 1px solid var(--line); border-radius: var(--r); background: var(--surface-2); }
+.live-head { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
+.live-lines { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; max-height: 280px; overflow-y: auto; }
+.live-lines li { display: grid; grid-template-columns: 56px 1fr; gap: 8px; font-size: 13px; padding: 6px 10px; border-radius: var(--r-sm); background: var(--surface); }
+.live-agent { border-left: 3px solid var(--sky); }
+.live-you { border-left: 3px solid var(--accent-soft); }

@@ -278,6 +278,57 @@ class VoiceService:
                           "voice_confirmed", offer["turn_id"])
         return True
 
+    def abandon_call(self, call_id: str, reason: str) -> dict:
+        """Close a call that never produced a conversation, and give the seller
+        side back to its agent. Only affects calls still `initiated`."""
+        call = self.db.voice_calls.find_one({"_id": call_id})
+        if not call:
+            raise NegotiationError("voice call not found", 404)
+        if call["status"] != "initiated":
+            return {"status": call["status"], "idempotent": True}
+        self.db.voice_calls.update_one({"_id": call_id}, {"$set": {
+            "status": "failed", "unconfirmed_reason": reason, "completed_at": _now()}})
+        if call.get("handed_over"):
+            try:
+                self.orch.handover(call["rfq_id"], call["seller_id"], "agent")
+            except NegotiationError:
+                pass
+        return {"status": "failed", "reason": reason}
+
+    def finalize_from_provider(self, call_id: str, conversation_id: str, client,
+                               wait_seconds: float = 60, poll_seconds: float = 3) -> dict:
+        """Pull a finished conversation from ElevenLabs and finalize the call.
+        The conversation must belong to our agent and carry this call's id, so a
+        caller cannot attach someone else's conversation to an RFQ."""
+        import time
+
+        call = self.db.voice_calls.find_one({"_id": call_id})
+        if not call:
+            raise NegotiationError("voice call not found", 404)
+        if call["status"] != "initiated":
+            return {"status": call["status"], "idempotent": True}
+        self.db.voice_calls.update_one({"_id": call_id}, {"$set": {"conversation_id": conversation_id}})
+
+        deadline = time.monotonic() + wait_seconds
+        conv = client.conversation(conversation_id)
+        while conv.get("status") not in ("done", "failed") and time.monotonic() < deadline:
+            time.sleep(poll_seconds)
+            conv = client.conversation(conversation_id)
+
+        if conv.get("agent_id") != client.agent_id:
+            raise NegotiationError("conversation belongs to a different agent", 403)
+        variables = (conv.get("conversation_initiation_client_data") or {}).get("dynamic_variables") or {}
+        if variables.get("call_id") != call_id:
+            raise NegotiationError("conversation does not belong to this call", 403)
+        if conv.get("status") == "failed":
+            return self.abandon_call(call_id, "voice provider reported the conversation failed")
+        if conv.get("status") != "done":
+            raise NegotiationError("the call is still being processed; try again in a moment", 409)
+
+        analysis = conv.get("analysis") or {}
+        return self.finalize_call(call_id, conv.get("transcript") or [], extract_terms(analysis),
+                                  conversation_id=conversation_id, analysis=analysis)
+
     def load_recorded(self, rfq_id: str, buyer_company_id: str, seller_id: str) -> dict:
         """Fallback demo: replay a call recorded in advance, labeled `recorded`."""
         if not RECORDED_FIXTURE.exists():
