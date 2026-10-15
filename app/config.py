@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     elevenlabs_api_key: str = ""
     elevenlabs_agent_id: str = ""
     elevenlabs_webhook_secret: str = ""
+    elevenlabs_phone_number_id: str = ""  # Twilio number imported into ElevenLabs
     jwt_secret: str = "change-me"
 
 

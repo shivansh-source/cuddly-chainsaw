@@ -33,8 +33,10 @@ def _seller_violations(action: Action, auth: SellerAuthority) -> list[str]:
         if action.qty > auth.stock_qty:
             out.append(f"qty {action.qty} exceeds stock {auth.stock_qty}")
     lead = action.lead_time_days if action.lead_time_days is not None else auth.lead_time_days
-    if lead > auth.deadline_days:
+    if auth.deadline_days is not None and lead > auth.deadline_days:
         out.append(f"lead time {lead}d beyond deadline {auth.deadline_days}d")
+    if lead < auth.lead_time_days:
+        out.append(f"lead time {lead}d is faster than catalog {auth.lead_time_days}d")
     return out
 
 

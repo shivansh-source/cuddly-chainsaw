@@ -1,0 +1,22 @@
+{
+  "_note": "Illustrative pre-recorded call for the demo fallback. Not a real conversation.",
+  "conversation_id": "recorded-demo-001",
+  "transcript": [
+    {"role": "agent", "time_in_call_secs": 0, "message": "Hello, this is an AI assistant calling on behalf of Acme Robotics. I'm calling about a request for 100 BME280 sensors. Is now a good time?"},
+    {"role": "user", "time_in_call_secs": 9, "message": "Yes, go ahead."},
+    {"role": "agent", "time_in_call_secs": 12, "message": "Thank you. What is your best unit price for 100 BME280 sensors?"},
+    {"role": "user", "time_in_call_secs": 20, "message": "For one hundred pieces I can do 395 rupees each, with a three day lead time."},
+    {"role": "agent", "time_in_call_secs": 30, "message": "Let me read that back. 100 units of BME280 at 395 rupees each, delivered in 3 days. Is that correct?"},
+    {"role": "user", "time_in_call_secs": 41, "message": "Yes, that's correct."}
+  ],
+  "analysis": {
+    "transcript_summary": "Supplier offered 395 INR per unit for 100 BME280, 3-day lead time, and confirmed the read-back.",
+    "data_collection_results": {
+      "confirmed_mpn": {"value": "BME280"},
+      "confirmed_unit_price": {"value": 395},
+      "confirmed_qty": {"value": 100},
+      "confirmed_lead_time_days": {"value": 3},
+      "readback_confirmed": {"value": true}
+    }
+  }
+}

@@ -166,14 +166,27 @@ VALIDATORS: dict[str, dict] = {
             },
         }
     },
+    "voice_calls": {
+        "$jsonSchema": {
+            "bsonType": "object",
+            "required": ["rfq_id", "seller_id", "mode", "status", "created_at"],
+            "properties": {
+                "mode": {"enum": ["live", "recorded"]},
+                "status": {"enum": ["initiated", "completed", "unconfirmed", "failed"]},
+                "created_at": {"bsonType": "date"},
+            },
+        }
+    },
     "offers": {
         "$jsonSchema": {
             "bsonType": "object",
             "required": [
-                "rfq_id", "company_id", "round", "version", "unit_price",
-                "qty", "source", "status",
+                "rfq_id", "company_id", "mpn", "side", "round", "version",
+                "unit_price", "qty", "source", "status",
             ],
             "properties": {
+                "mpn": {"bsonType": "string"},
+                "side": {"enum": ["buyer", "seller"]},
                 "unit_price": _num(0),
                 "qty": _num(1),
                 "round": {"bsonType": ["int", "long"], "minimum": 0},
@@ -201,11 +214,15 @@ INDEXES: dict[str, list[tuple[list[tuple[str, int]], dict]]] = {
     "turns": [([("rfq_id", ASCENDING), ("created_at", ASCENDING)], {})],
     "offers": [([("rfq_id", ASCENDING), ("round", ASCENDING)], {})],
     "recommendations": [([("rfq_id", ASCENDING), ("created_at", ASCENDING)], {})],
+    "voice_calls": [
+        ([("rfq_id", ASCENDING), ("created_at", ASCENDING)], {}),
+        ([("conversation_id", ASCENDING)], {}),
+    ],
 }
 
 ALL_COLLECTIONS = [
     "users", "companies", "catalog_items", "pricing_rules",
-    "rfqs", "turns", "offers", "recommendations",
+    "rfqs", "turns", "offers", "recommendations", "voice_calls",
 ]
 
 

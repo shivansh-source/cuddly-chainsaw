@@ -117,8 +117,7 @@ def test_explanation_is_built_from_the_breakdown():
 
 
 def test_source_label_passes_through():
-    q = quote("a")
-    q.source = "human_seller"
+    q = quote("a", source="human_seller")
     assert recommend(REQ, [q], DEADLINE).ranked[0].source == "human_seller"
 
 
@@ -143,3 +142,14 @@ def test_no_deal_when_buyer_ceiling_is_below_seller_floor():
     limits = buyer_limits(30000, "landed_incl_tax", 0.18, [("X", 100, 360.0)])
     res = negotiate_line(RULE, 100, limits["X"])
     assert res.agreed_price is None and len(res.rounds) == RULE.max_rounds + 1
+
+
+def test_mixed_sources_label_the_offer_by_its_most_human_line_and_keep_each_line():
+    req = [RfqLineReq(mpn="X", qty=100), RfqLineReq(mpn="Y", qty=100)]
+    common = dict(qty=100, moq=10, stock_qty=500, lead_time_days=3, tax_rate=0.18)
+    q = SupplierQuote(company_id="s", reliability_score=80, lines=[
+        LineQuote(mpn="X", unit_price=100, source="engine", **common),
+        LineQuote(mpn="Y", unit_price=50, source="voice_confirmed", **common)])
+    offer = recommend(req, [q], 10).ranked[0]
+    assert offer.source == "voice_confirmed"
+    assert offer.line_sources == {"X": "engine", "Y": "voice_confirmed"}

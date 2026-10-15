@@ -79,8 +79,8 @@ class SellerAuthority(BaseModel):
     floor_price: float
     moq: int
     stock_qty: int
-    lead_time_days: int  # catalog default, used when the action omits it
-    deadline_days: int
+    lead_time_days: int  # catalog capability; also the default when the action omits it
+    deadline_days: int | None = None  # None: deadline is left to eligibility
 
 
 class BuyerAuthority(BaseModel):
@@ -135,6 +135,7 @@ class LineQuote(BaseModel):
     discount: float = 0.0
     specs: dict[str, Any] = {}
     initial_unit_price: float | None = None  # round-0 quote, same qty and terms
+    source: Source = "engine"                # who produced this line's price
 
 
 class SupplierQuote(BaseModel):
@@ -148,7 +149,8 @@ class SupplierQuote(BaseModel):
 class RankedOffer(BaseModel):
     company_id: str
     name: str = ""
-    source: Source
+    source: Source                           # most human source among the lines
+    line_sources: dict[str, Source] = {}     # per-line label, never merged away
     eligible: bool
     landed_cost: float | None = None
     lead_time_days: int | None = None

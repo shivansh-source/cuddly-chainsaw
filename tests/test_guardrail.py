@@ -90,6 +90,7 @@ def test_cannot_confirm_an_ok_result():
     (dict(qty=5), "below MOQ"),
     (dict(qty=900), "exceeds stock"),
     (dict(lead_time_days=30), "beyond deadline"),
+    (dict(lead_time_days=1), "faster than catalog"),
     (dict(mpn="ESP32-X"), "MPN mismatch"),
     (dict(mpn=None), "MPN mismatch"),
     (dict(unit_price=None), "price missing"),
