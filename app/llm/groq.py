@@ -1,9 +1,13 @@
 """Groq (OpenAI-compatible chat completions) client."""
+import time
+
 import httpx
 
 from app.llm.base import LLMError
 
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
+MAX_RATE_LIMIT_RETRIES = 2   # free tier returns 429 under bursts
+MAX_BACKOFF_SECONDS = 8.0
 
 
 class GroqClient:
@@ -30,8 +34,14 @@ class GroqClient:
             ],
         }
         try:
-            resp = self._client.post(GROQ_URL, json=body)
-            resp.raise_for_status()
-            return resp.json()["choices"][0]["message"]["content"]
+            for attempt in range(MAX_RATE_LIMIT_RETRIES + 1):
+                resp = self._client.post(GROQ_URL, json=body)
+                if resp.status_code == 429 and attempt < MAX_RATE_LIMIT_RETRIES:
+                    wait = float(resp.headers.get("retry-after") or 2 ** attempt)
+                    time.sleep(min(wait, MAX_BACKOFF_SECONDS))
+                    continue
+                resp.raise_for_status()
+                return resp.json()["choices"][0]["message"]["content"]
         except (httpx.HTTPError, KeyError, IndexError, ValueError) as exc:
             raise LLMError(f"groq request failed: {exc}") from exc
+        raise LLMError("groq request failed: retries exhausted")

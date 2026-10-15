@@ -53,7 +53,7 @@ def rfq_for_seller(rfq: dict, company_id: str) -> dict:
 
 def clean_json(value: Any) -> Any:
     """ObjectId/datetime-safe copy for JSON responses."""
-    from datetime import datetime
+    from datetime import datetime, timezone
 
     from bson import ObjectId
     if isinstance(value, dict):
@@ -61,7 +61,11 @@ def clean_json(value: Any) -> Any:
     if isinstance(value, list):
         return [clean_json(v) for v in value]
     if isinstance(value, datetime):
-        return value.isoformat()
+        # MongoDB hands back naive UTC; always emit an explicit offset so a
+        # browser never reads it as local time.
+        if value.tzinfo is None:
+            value = value.replace(tzinfo=timezone.utc)
+        return value.astimezone(timezone.utc).isoformat()
     if isinstance(value, ObjectId):
         return str(value)
     return value

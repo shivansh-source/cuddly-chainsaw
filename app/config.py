@@ -8,12 +8,14 @@ class Settings(BaseSettings):
     mongodb_db: str = "negotiator"
 
     groq_api_key: str = ""
-    groq_model: str = "llama-3.3-70b-versatile"
+    groq_model: str = "openai/gpt-oss-120b"
     elevenlabs_api_key: str = ""
     elevenlabs_agent_id: str = ""
     elevenlabs_webhook_secret: str = ""
     elevenlabs_phone_number_id: str = ""  # Twilio number imported into ElevenLabs
     jwt_secret: str = "change-me"
+    # Comma-separated browser origins allowed to call the API (your frontend).
+    cors_origins: str = "http://localhost:5173,http://localhost:3000"
 
 
 settings = Settings()
