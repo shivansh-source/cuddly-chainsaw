@@ -26,9 +26,10 @@ app = FastAPI(title="The Negotiator")
 app.include_router(voice_router)
 
 _origins = [o.strip() for o in settings.cors_origins.split(",") if o.strip()]
-if _origins:
-    app.add_middleware(CORSMiddleware, allow_origins=_origins, allow_credentials=False,
-                       allow_methods=["*"], allow_headers=["*"])
+if _origins or settings.cors_origin_regex:
+    app.add_middleware(CORSMiddleware, allow_origins=_origins,
+                       allow_origin_regex=settings.cors_origin_regex or None,
+                       allow_credentials=False, allow_methods=["*"], allow_headers=["*"])
 
 
 def _plain(doc: dict) -> dict:
