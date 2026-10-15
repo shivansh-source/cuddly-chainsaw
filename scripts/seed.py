@@ -15,14 +15,15 @@ def main() -> None:
     for name in ALL_COLLECTIONS:
         db[name].delete_many({})
 
-    db.companies.insert_many(sd.COMPANIES)
+    db.companies.insert_many(sd.companies())
+    pw = hash_password(sd.DEMO_PASSWORD)
     db.users.insert_many(
-        [{"email": e, "role": r, "company_id": c, "password_hash": hash_password(sd.DEMO_PASSWORD)}
-         for e, r, c in sd.USERS]
+        [{"email": e, "role": r, "company_id": c, "password_hash": pw}
+         for e, r, c in sd.users()]
     )
     db.catalog_items.insert_many(sd.catalog_items())
     db.pricing_rules.insert_many(sd.pricing_rules())
-    db.rfqs.insert_one(sd.sample_rfq())
+    db.rfqs.insert_many(sd.rfqs())
 
     for name in ALL_COLLECTIONS:
         print(f"{name:16s} {db[name].count_documents({})}")

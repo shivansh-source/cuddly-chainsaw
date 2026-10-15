@@ -53,10 +53,11 @@ VALIDATORS: dict[str, dict] = {
     "catalog_items": {
         "$jsonSchema": {
             "bsonType": "object",
-            "required": ["company_id", "mpn", "stock_qty", "lead_time_days", "moq", "tax_rate"],
+            "required": ["company_id", "mpn", "specs", "stock_qty", "lead_time_days", "moq", "tax_rate"],
             "properties": {
                 "company_id": {"bsonType": "string"},
                 "mpn": {"bsonType": "string"},
+                "specs": {"bsonType": "object"},
                 "stock_qty": _num(0),
                 "lead_time_days": _num(0),
                 "moq": _num(1),
@@ -101,13 +102,67 @@ VALIDATORS: dict[str, dict] = {
     "rfqs": {
         "$jsonSchema": {
             "bsonType": "object",
-            "required": ["buyer_company_id", "title", "budget", "currency", "status", "round", "lines"],
+            "required": [
+                "buyer_company_id", "title", "budget", "budget_basis", "currency",
+                "status", "round", "lines", "participants",
+            ],
             "properties": {
                 "budget": _num(0),
+                "budget_basis": {"enum": ["landed_incl_tax", "pre_tax"]},
                 "currency": {"bsonType": "string"},
                 "status": {"enum": ["draft", "open", "negotiating", "completed", "cancelled"]},
                 "round": {"bsonType": ["int", "long"], "minimum": 0},
-                "lines": {"bsonType": "array", "minItems": 1},
+                "lines": {
+                    "bsonType": "array",
+                    "minItems": 1,
+                    "items": {
+                        "bsonType": "object",
+                        "required": ["mpn", "qty", "required_specs", "mandatory"],
+                        "properties": {
+                            "mpn": {"bsonType": "string"},
+                            "qty": _num(1),
+                            "required_specs": {"bsonType": "object"},
+                            "mandatory": {"bsonType": "bool"},
+                        },
+                    },
+                },
+                "participants": {
+                    "bsonType": "array",
+                    "items": {
+                        "bsonType": "object",
+                        "required": ["company_id", "side", "controller", "status"],
+                        "properties": {
+                            "side": {"enum": ["buyer", "seller"]},
+                            "controller": {"enum": ["agent", "human"]},
+                        },
+                    },
+                },
+            },
+        }
+    },
+    "turns": {
+        "$jsonSchema": {
+            "bsonType": "object",
+            "required": [
+                "rfq_id", "round", "participant_id", "controller",
+                "guardrail_result", "created_at",
+            ],
+            "properties": {
+                "round": {"bsonType": ["int", "long"], "minimum": 0},
+                "controller": {"enum": ["agent", "human", "engine"]},
+                "validated_action": {"bsonType": ["object", "null"]},
+                "guardrail_result": {"bsonType": "object"},
+                "created_at": {"bsonType": "date"},
+            },
+        }
+    },
+    "recommendations": {
+        "$jsonSchema": {
+            "bsonType": "object",
+            "required": ["rfq_id", "ranked", "explanation", "created_at"],
+            "properties": {
+                "ranked": {"bsonType": "array"},
+                "created_at": {"bsonType": "date"},
             },
         }
     },
