@@ -7,13 +7,28 @@ Policy on missing data:
     criterion and is flagged. Missing data never scores well.
 """
 from app.engine.models import (
-    LineQuote, RankedOffer, Recommendation, RfqLineReq, SupplierQuote,
+    LineQuote, RankedOffer, Recommendation, RfqLineReq, Source, SupplierQuote,
 )
 from app.specs import check_specs
 
 WEIGHTS = {"cost": 0.50, "delivery": 0.20, "reliability": 0.15, "improvement": 0.15}
 DEADLINE_BUFFER_RATIO = 0.5   # lead time within half the deadline scores 100
 IMPROVEMENT_CAP = 0.20        # a 20% negotiated improvement scores 100
+
+# Higher wins when lines come from different sources: the offer is labeled by
+# its most human-sourced line, and every line keeps its own label too.
+SOURCE_PRECEDENCE: dict[str, int] = {
+    "engine": 0, "seeded": 0, "llm_agent": 1, "human_buyer": 2,
+    "human_seller": 3, "voice_confirmed": 4,
+}
+
+
+def _line_sources(q: SupplierQuote) -> tuple[Source, dict[str, Source]]:
+    per_line = {ln.mpn: ln.source for ln in q.lines}
+    if not per_line:
+        return q.source, {}
+    best = max(per_line.values(), key=lambda s: SOURCE_PRECEDENCE.get(s, 0))
+    return best, per_line
 
 
 def landed_cost(line: LineQuote) -> float:
@@ -141,8 +156,10 @@ def recommend(
             ),
         }
         total = round(sum(breakdown[k] * w for k, w in WEIGHTS.items()), 2)
+        source, per_line = _line_sources(q)
         offer = RankedOffer(
-            company_id=q.company_id, name=q.name, source=q.source, eligible=True,
+            company_id=q.company_id, name=q.name, source=source, line_sources=per_line,
+            eligible=True,
             landed_cost=cost, lead_time_days=lead, total_score=total,
             breakdown=breakdown, improvement_pct=imp, flags=flags,
         )
@@ -155,8 +172,10 @@ def recommend(
     rejected: list[RankedOffer] = []
     for q, failures, warnings in evaluated:
         if failures:
+            source, per_line = _line_sources(q)
             rejected.append(RankedOffer(
-                company_id=q.company_id, name=q.name, source=q.source, eligible=False,
+                company_id=q.company_id, name=q.name, source=source,
+                line_sources=per_line, eligible=False,
                 landed_cost=_total(q), lead_time_days=_lead(q),
                 eligibility_failures=failures, flags=warnings,
                 explanation="Not eligible: " + "; ".join(failures),
