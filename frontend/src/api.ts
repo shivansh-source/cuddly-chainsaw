@@ -132,6 +132,14 @@ export const api = {
   voiceCalls: (id: string) => request<VoiceCall[]>(`/rfqs/${id}/voice`),
   voiceRecorded: (id: string, sellerId: string) =>
     post<{ call_id: string; status: string }>(`/rfqs/${id}/voice/recorded`, { seller_id: sellerId }),
+  voiceSession: (id: string, sellerId: string) =>
+    post<{
+      call_id: string; session_token: string; signed_url: string | null; browser_voice_error: string | null;
+      dynamic_variables: Record<string, string | number | boolean>;
+    }>(`/rfqs/${id}/voice/session`, { seller_id: sellerId }),
+  voiceFinalize: (id: string, callId: string, conversationId: string | null) =>
+    post<{ status: string; reason?: string | null; idempotent?: boolean }>(
+      `/rfqs/${id}/voice/${callId}/finalize`, { conversation_id: conversationId }),
   voiceCall: (id: string, sellerId: string, toNumber: string) =>
     post<{ call_id: string; conversation_id: string | null }>(`/rfqs/${id}/voice/call`,
       { seller_id: sellerId, to_number: toNumber }),

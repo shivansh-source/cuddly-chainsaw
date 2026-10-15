@@ -2,6 +2,7 @@ import { useState } from "react";
 import { api } from "../api";
 import { dateTime, inr } from "../format";
 import type { Offer, Rfq, VoiceCall } from "../types";
+import { LiveTalk } from "./LiveTalk";
 import { Badge, Card, Empty, Icon, useAction } from "./ui";
 
 type StepState = "done" | "no" | "na";
@@ -49,6 +50,7 @@ export function VoicePanel({ rfq, calls, offers, name, canAct, onChanged }: {
               <Icon name="play" size={14} /> {busy === "rec" ? "Loading…" : "Replay recorded demo call"}
             </button>
           </div>
+          {seller && <LiveTalk rfq={rfq} seller={seller} sellerName={name(seller)} onFinished={onChanged} />}
           <div className="form-row">
             <label className="field">Phone number (E.164)
               <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+91XXXXXXXXXX" inputMode="tel" />
