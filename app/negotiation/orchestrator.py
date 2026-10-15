@@ -44,6 +44,10 @@ class Orchestrator:
         self.db = db
         self.llm = llm
 
+    def _llm_for(self, rfq: dict) -> LLMClient | None:
+        """An RFQ flagged engine_only never calls the model: fully deterministic."""
+        return None if rfq.get("engine_only") else self.llm
+
     # ------------------------------------------------------------------ lookups
     def get_rfq(self, rfq_id: str) -> dict:
         rfq = self.db.rfqs.find_one({"_id": rfq_id})
@@ -187,7 +191,7 @@ class Orchestrator:
                    stock_qty=cat["stock_qty"], lead_time_days=cat["lead_time_days"],
                    deadline_days=rfq["deadline_days"],
                    buyer_last_bid=last_bid["unit_price"] if last_bid else None)
-        outcome = decide_action(self.llm, prompts.seller_system(), prompts.seller_user(ctx),
+        outcome = decide_action(self._llm_for(rfq), prompts.seller_system(), prompts.seller_user(ctx),
                                 seller, auth, fallback, mpn, qty)
         return self._apply(rfq, seller, rnd, mpn, outcome, cat["tax_rate"],
                            cat["lead_time_days"], rfq["buyer_company_id"])
@@ -217,7 +221,7 @@ class Orchestrator:
         ctx = dict(mpn=mpn, qty=line["qty"], round=rnd, max_rounds=self._max_rounds(rfq),
                    target=limit.target, ceiling=limit.ceiling, policy_bid=policy,
                    seller_ask=ask["unit_price"], deadline_days=rfq["deadline_days"])
-        outcome = decide_action(self.llm, prompts.buyer_system(), prompts.buyer_user(ctx),
+        outcome = decide_action(self._llm_for(rfq), prompts.buyer_system(), prompts.buyer_user(ctx),
                                 buyer, auth, fallback, mpn, line["qty"])
         bid = self._apply(rfq, buyer, rnd, mpn, outcome, 0.18, None, seller_id)
         if bid and bid["unit_price"] >= ask["unit_price"]:
@@ -268,12 +272,14 @@ class Orchestrator:
         self.db.rfqs.update_one({"_id": rfq["_id"]}, {"$set": {"round": rnd}})
         rfq["round"] = rnd
 
-    def start(self, rfq_id: str) -> dict:
+    def start(self, rfq_id: str, engine_only: bool = False) -> dict:
         rfq = self.get_rfq(rfq_id)
         if rfq["status"] not in ("draft", "open"):
             raise NegotiationError(f"RFQ is {rfq['status']}, cannot start")
-        self.db.rfqs.update_one({"_id": rfq_id}, {"$set": {"status": "negotiating"}})
+        self.db.rfqs.update_one({"_id": rfq_id}, {"$set": {
+            "status": "negotiating", "engine_only": engine_only}})
         rfq["status"] = "negotiating"
+        rfq["engine_only"] = engine_only
         self.step_round(rfq, 0)
         return rfq
 
@@ -287,8 +293,8 @@ class Orchestrator:
         self.step_round(rfq, rnd)
         return rfq
 
-    def run_all(self, rfq_id: str) -> dict:
-        rfq = self.start(rfq_id)
+    def run_all(self, rfq_id: str, engine_only: bool = False) -> dict:
+        rfq = self.start(rfq_id, engine_only)
         while rfq["round"] < self._max_rounds(rfq):
             self.step_round(rfq, rfq["round"] + 1)
         return self.finalize(rfq_id)

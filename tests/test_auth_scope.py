@@ -197,3 +197,16 @@ def test_change_stream_wait_falls_back_to_sleep_on_standalone(seeded):
     start = time.monotonic()
     main_module._wait_for_change(RFQ, 0.2)
     assert time.monotonic() - start < 3
+
+
+def test_every_timestamp_carries_an_explicit_utc_offset(api):
+    api.buyer.post(f"/rfqs/{RFQ}/start", json={"engine_only": True})
+    rfq = api.buyer.get(f"/rfqs/{RFQ}").json()
+    stamps = [rfq["deadline"], rfq["created_at"]]
+    stamps += [o["created_at"] for o in api.buyer.get(f"/rfqs/{RFQ}/offers").json()]
+    stamps += [t["created_at"] for t in api.buyer.get(f"/rfqs/{RFQ}/turns").json()]
+    assert stamps and all(s.endswith("+00:00") for s in stamps)
+    cursor = api.buyer.get(f"/rfqs/{RFQ}/updates").json()["cursor"]
+    assert cursor.endswith("+00:00")
+    again = api.buyer.get(f"/rfqs/{RFQ}/updates", params={"since": cursor}).json()
+    assert again["offers"] == []

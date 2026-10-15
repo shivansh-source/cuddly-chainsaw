@@ -4,12 +4,14 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from fastapi import Depends, FastAPI, HTTPException, Query
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, ValidationError
 from pymongo.errors import PyMongoError
 
 from app import scope
 from app.auth import User, create_token, current_user
+from app.config import settings
 from app.db import get_db
 from app.deps import (
     _llm, buyer_only, get_llm, get_orchestrator, guard as _guard, rfq_for as _rfq_for,
@@ -22,6 +24,11 @@ from app.security import verify_password
 
 app = FastAPI(title="The Negotiator")
 app.include_router(voice_router)
+
+_origins = [o.strip() for o in settings.cors_origins.split(",") if o.strip()]
+if _origins:
+    app.add_middleware(CORSMiddleware, allow_origins=_origins, allow_credentials=False,
+                       allow_methods=["*"], allow_headers=["*"])
 
 
 def _plain(doc: dict) -> dict:
@@ -216,6 +223,7 @@ def get_rfq(rfq_id: str, user: User = Depends(current_user),
 
 class StartIn(BaseModel):
     run_all: bool = False
+    engine_only: bool = False  # skip the LLM: deterministic, same result every time
 
 
 @app.post("/rfqs/{rfq_id}/start")
@@ -226,9 +234,9 @@ def start_rfq(rfq_id: str, body: StartIn | None = None, user: User = Depends(buy
     _rfq_for(user, rfq_id, orch)
     body = body or StartIn()
     if body.run_all:
-        rec = _guard(lambda: orch.run_all(rfq_id))
+        rec = _guard(lambda: orch.run_all(rfq_id, body.engine_only))
         return {"status": "completed", "recommendation": scope.clean_json(rec)}
-    rfq = _guard(lambda: orch.start(rfq_id))
+    rfq = _guard(lambda: orch.start(rfq_id, body.engine_only))
     return {"status": rfq["status"], "round": rfq["round"]}
 
 
@@ -375,7 +383,7 @@ def _updates(user: User, rfq: dict, since: datetime | None) -> dict:
     return scope.clean_json({
         "status": rfq["status"], "round": rfq["round"],
         "offers": offers, "turns": turns,
-        "cursor": cursor.isoformat() if cursor else None,
+        "cursor": cursor,  # datetime; clean_json emits explicit UTC
     })
 
 

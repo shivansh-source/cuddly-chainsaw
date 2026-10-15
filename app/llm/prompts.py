@@ -2,6 +2,8 @@
 so a buyer prompt can never contain a seller floor and vice versa."""
 import json
 
+CURRENCY = "All prices are in Indian rupees (INR) per unit. Use the rupee sign, never $. "
+
 OUTPUT_SPEC = (
     'Reply with ONE JSON object: {"type": "counter"|"accept"|"walk_away", '
     '"unit_price": number, "qty": integer, "lead_time_days": integer, "message": string}. '
@@ -18,7 +20,7 @@ def seller_system() -> str:
     return (
         "You are a supplier's sales agent negotiating the unit price of one electronic "
         "component. Hold your price near the policy price, never go below your floor, "
-        "and justify moves briefly. " + _SAFETY + " " + OUTPUT_SPEC
+        "and justify moves briefly. " + CURRENCY + _SAFETY + " " + OUTPUT_SPEC
     )
 
 
@@ -26,7 +28,7 @@ def buyer_system() -> str:
     return (
         "You are a buyer's procurement agent negotiating the unit price of one electronic "
         "component. Push for a lower price but never offer above your ceiling. "
-        + _SAFETY + " " + OUTPUT_SPEC
+        + CURRENCY + _SAFETY + " " + OUTPUT_SPEC
     )
 
 
