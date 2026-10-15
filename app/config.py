@@ -16,6 +16,9 @@ class Settings(BaseSettings):
     jwt_secret: str = "change-me"
     # Comma-separated browser origins allowed to call the API (your frontend).
     cors_origins: str = "http://localhost:5173,http://localhost:3000"
+    # Optional regex for origins that change per deploy, e.g. Vercel previews:
+    # ^https://negotiator-[a-z0-9-]+\.vercel\.app$
+    cors_origin_regex: str = ""
 
 
 settings = Settings()
