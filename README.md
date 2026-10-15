@@ -1,3 +1,4 @@
+# the deployable link :  https://cuddly-chainsaw-smoky.vercel.app/
 # The Negotiator: API
 
 Buyers post a bill of materials. Supplier agents negotiate over several rounds, a human on either side can take over (including by voice), and the result is a ranked, evidence-backed recommendation.
